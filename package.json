@@ -1,6 +1,6 @@
 {
   "name": "verify-json",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Library to verify JSON structure easily using a lightweight JSON schema syntax",
   "main": "./lib/index.js",
   "scripts": {
