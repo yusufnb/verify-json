@@ -40,13 +40,13 @@ let json = {
 };
 
 // <key>:<validator>
-// <key>:!<validator> - uses ! for optional
+// <key>:?<validator> - uses ? for optional
 // <key> - required non null attribute of any type
 // Skip all the quotations
 const schema = `{markers: [{
       name:string,
       location:[:lat,:long],
-      favorite:!b,
+      favorite:?b,
       color
   }]
 }`;

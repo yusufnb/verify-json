@@ -79,7 +79,7 @@ const verify = (obj, sch, validators = {}) => {
         m[1].split(",").forEach((v) => verifyValidator(v, i));
       } else if ((m = s.match(/^\{(.+)\}$/))) {
         m[1]
-          .replace(/\!/g, "")
+          .replace(/[\!\?]/g, "")
           .split(",")
           .forEach((part) => {
             let [k, v] = part.split(":");
@@ -99,7 +99,7 @@ const verify = (obj, sch, validators = {}) => {
     let m;
     let type = null;
     let optional = false;
-    if (sch.match(/^\!/)) {
+    if (sch.match(/^[\!\?]/)) {
       sch = sch.substr(1);
       optional = true;
     }

@@ -8,11 +8,11 @@ describe("Development", () => {
     expect(() => verify({}, "{a:test}", { test: true })).to.throw(
       "validators.test: validation failed"
     );
-    expect(verify({ a: [1, "2"] }, "{a:![:i,s]}")).to.be.true;
+    expect(verify({ a: [1, "2"] }, "{a:?[:i,s]}")).to.be.true;
     expect(() => verify({}, "{a:[i,s]}}")).to.throw("Malformed schema");
     expect(() => verify({}, "{a:[z]}")).to.throw("Invalid validator: z");
     expect(
-      verify({}, "{a:![z]}", {
+      verify({}, "{a:?[z]}", {
         z: function () {
           return true;
         },
@@ -21,8 +21,8 @@ describe("Development", () => {
   });
 
   it("should verify simple plain objects", () => {
-    expect(verify(null, "!{}")).to.be.true;
-    expect(verify(null, "![]")).to.be.true;
+    expect(verify(null, "?{}")).to.be.true;
+    expect(verify(null, "?[]")).to.be.true;
     expect(verify({}, "{}")).to.be.true;
 
     expect(verify({ a: 1, b: 2 }, "{a,b}")).to.be.true;
@@ -35,7 +35,7 @@ describe("Development", () => {
     expect(() => verify({ a: [] }, "{a,b}") === true).to.throw(
       "json.b: is required"
     );
-    expect(verify({ a: 1 }, "{a,b:!}")).to.be.true;
+    expect(verify({ a: 1 }, "{a,b:?}")).to.be.true;
     expect(verify({ a: 1, b: false }, "{a,b}")).to.be.true;
     expect(() => verify({ a: 1, b: null }, "{a,b}")).to.throw(
       "json.b: is required"
@@ -106,7 +106,7 @@ describe("Development", () => {
           e: 1,
           p: 1,
         },
-        "{a:number,b:string,c:{ def:{ e: [ { a,b:[s],c:string } ] },e:[i],p:number,f:!string }, e:!, p:!}"
+        "{a:number,b:string,c:{ def:{ e: [ { a,b:[s],c:string } ] },e:[i],p:number,f:?string }, e:?, p, q:?, r:!}"
       )
     ).to.be.true;
   });
