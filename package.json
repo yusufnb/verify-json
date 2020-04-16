@@ -1,6 +1,6 @@
 {
   "name": "verify-json",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Library to verify JSON structure easily using a lightweight JSON schema syntax",
   "main": "./lib/index.js",
   "scripts": {
@@ -24,11 +24,12 @@
     "url": "git+https://github.com/yusufnb/verify-json.git"
   },
   "keywords": [
-    "boilerplate",
-    "npm",
-    "module",
-    "node",
-    "javascript"
+    "json",
+    "json-schema",
+    "validator",
+    "jsonschema",
+    "json-schema-validator",
+    "json-schema-validation"
   ],
   "author": "Yusuf Bhabhrawala <yusuf@ynzi.com>",
   "license": "MIT",
