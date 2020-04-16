@@ -49,7 +49,8 @@ const verify = (obj, sch, validators = {}) => {
         sch.substr(0, m.index) +
         lookups.length +
         sch.substr(m.index + m[0].length);
-
+      // support [:i,:s] instead of [i,s]
+      if (m[0].match(/^\[/)) m[0] = m[0].replace(/\:/g, "");
       lookups.push(m[0]);
       found = true;
     }
@@ -75,7 +76,7 @@ const verify = (obj, sch, validators = {}) => {
     lookups.forEach((s, i) => {
       let m;
       if ((m = s.match(/^\[(.+)\]$/))) {
-        verifyValidator(m[1], i);
+        m[1].split(",").forEach((v) => verifyValidator(v, i));
       } else if ((m = s.match(/^\{(.+)\}$/))) {
         m[1]
           .replace(/\!/g, "")
@@ -90,6 +91,8 @@ const verify = (obj, sch, validators = {}) => {
 
   validateValidators();
 
+  //console.log("lookups", lookups);
+
   // flat validator
   function validate(path, obj, sch) {
     //console.log("validate", obj, sch);
@@ -101,18 +104,17 @@ const verify = (obj, sch, validators = {}) => {
       optional = true;
     }
 
+    if (optional && (obj === undefined || obj === null)) return true;
+
     // if lookup, validate further
     if ((m = sch.match(/^[0-9]+$/)))
       return validate(`${path}`, obj, lookups[sch * 1]);
 
     // if validator verify it now
     if (sch.match(/^[a-zA-Z0-9]*$/)) {
-      if (!obj) {
-        if (optional) return true;
-        else {
-          errors.push(`${path}: is required`);
-          return false;
-        }
+      if (obj === undefined || obj === null) {
+        errors.push(`${path}: is required`);
+        return false;
       }
 
       if (sch === "") return true; // no validation needed
@@ -135,7 +137,7 @@ const verify = (obj, sch, validators = {}) => {
       type = "array";
       sch = m[1];
     } else if ((m = sch.match(/^\{(.*)\}$/))) {
-      if (!_.isObject(obj)) {
+      if (!_.isPlainObject(obj)) {
         errors.push(`${path}: should be object`);
         return false;
       }
@@ -148,7 +150,9 @@ const verify = (obj, sch, validators = {}) => {
 
     // if array, validate for all
     if (type === "array") {
-      for (let i in obj) validate(`${path}.${i}`, obj[i], sch);
+      let sch_parts = sch.split(",");
+      for (let i in obj)
+        validate(`${path}.${i}`, obj[i], sch_parts[i % sch_parts.length]);
     }
 
     if (type === "object" && sch !== "") {
@@ -169,6 +173,8 @@ const verify = (obj, sch, validators = {}) => {
 
   return true;
 };
+
+_.mixin({ verify: verify }, { chain: false });
 
 export default verify;
 
