@@ -111,7 +111,7 @@ const verify = (obj, sch, validators = {}) => {
       return validate(`${path}`, obj, lookups[sch * 1]);
 
     // if validator verify it now
-    if (sch.match(/^[a-zA-Z0-9]*$/)) {
+    if (sch.match(/^[a-zA-Z0-9_]*$/)) {
       if (obj === undefined || obj === null) {
         errors.push(`${path}: is required`);
         return false;
