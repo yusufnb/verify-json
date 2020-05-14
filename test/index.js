@@ -48,7 +48,7 @@ describe('Development', () => {
     expect(() => verify([1, '2', 3], '[i]')).to.throw('json.1: validation failed');
   });
 
-  it.only('should work with custom validators', () => {
+  it('should work with custom validators', () => {
     assert(
       verify({ a: 'hello' }, '{a: custom }', {
         custom: function (v, args) {
@@ -60,9 +60,9 @@ describe('Development', () => {
 
     expect(() =>
       verify({}, '{}', {
-        'a-b': function () {},
+        a_b: function () {},
       })
-    ).to.throw('sdfsd');
+    ).to.throw('Invalid validator key: a_b');
 
     let validator = {
       custom: function (v, args) {
