@@ -8,7 +8,7 @@ const verify = (json, sch, validators = {}) => {
   // verify the format of validators
   if (!_.isEmpty(validators)) {
     for (let k in validators) {
-      if (!k.match(/^[a-zA-Z0-9]+$/)) errors.push(`Invalid validator key: ${k}`);
+      if (!k.match(/^[a-zA-Z0-9_]+$/)) errors.push(`Invalid validator key: ${k}`);
       else if (!_.isFunction(validators[k])) errors.push(`Invalid validator: ${k}`);
     }
     if (errors.length > 0) throw errors.join(', ');
@@ -100,7 +100,7 @@ const verify = (json, sch, validators = {}) => {
     if ((m = sch.match(/^[0-9]+$/))) return validate({ path: `${path}`, obj, sch: lookups[sch * 1], parent: parent });
 
     // if validator verify it now
-    if (sch.match(/^[a-zA-Z0-9]*$/)) {
+    if (sch.match(/^[a-zA-Z0-9_]*$/)) {
       if (obj === undefined || obj === null) {
         errors.push(`${path}: is required`);
         return false;
