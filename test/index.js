@@ -58,11 +58,28 @@ describe('Development', () => {
       'Failed'
     );
 
+    assert(
+      verify({ a: 'hello' }, '{a:my_val }', {
+        my_val: function (v, args) {
+          return v === 'hello';
+        },
+      }) === true,
+      'Failed'
+    );
+
+    expect(() =>
+      verify({ a: 'hello' }, '{a:my_val }', {
+        my_val: function (v, args) {
+          return v === 'world';
+        },
+      })
+    ).to.throw('json.a: validation failed');
+
     expect(() =>
       verify({}, '{}', {
-        a_b: function () {},
+        'a-b': function () {},
       })
-    ).to.throw('Invalid validator key: a_b');
+    ).to.throw('Invalid validator key: a-b');
 
     let validator = {
       custom: function (v, args) {
