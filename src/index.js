@@ -1,7 +1,7 @@
 /* eslint-disable nonblock-statement-body-position */
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-cond-assign */
-import _ from 'lodash';
+import _ from "lodash";
 const verify = (json, sch, validators = {}) => {
   let errors = [];
 
@@ -11,7 +11,7 @@ const verify = (json, sch, validators = {}) => {
       if (!k.match(/^[a-zA-Z0-9_]+$/)) errors.push(`Invalid validator key: ${k}`);
       else if (!_.isFunction(validators[k])) errors.push(`Invalid validator: ${k}`);
     }
-    if (errors.length > 0) throw errors.join(', ');
+    if (errors.length > 0) throw errors.join(", ");
   }
 
   // extend validators with inbuilts
@@ -30,7 +30,7 @@ const verify = (json, sch, validators = {}) => {
   );
 
   // strip all white spaces
-  sch = sch.replace(/\s/g, '');
+  sch = sch.replace(/\s/g, "");
 
   let lookups = [];
 
@@ -40,14 +40,14 @@ const verify = (json, sch, validators = {}) => {
     while ((m = sch.match(/(\[[^\[\]\{\}]*\])/)) || (m = sch.match(/(\{[^\{\}\[\]]*\})/))) {
       sch = sch.substr(0, m.index) + lookups.length + sch.substr(m.index + m[0].length);
       // support [:i,:s] instead of [i,s]
-      if (m[0].match(/^\[/)) m[0] = m[0].replace(/\:/g, '');
+      if (m[0].match(/^\[/)) m[0] = m[0].replace(/\:/g, "");
       lookups.push(m[0]);
       found = true;
     }
 
     if (found) reduce(sch);
     if (!found && (sch.match(/[\[\]]/) || sch.match(/[\{\}]/))) {
-      throw 'Malformed schema';
+      throw "Malformed schema";
     }
     return sch;
   }
@@ -56,7 +56,7 @@ const verify = (json, sch, validators = {}) => {
 
   function validateValidators() {
     function verifyValidator(str, max) {
-      if (!str || str === '') return;
+      if (!str || str === "") return;
       if (str.match(/^[0-9]+$/)) {
         if (str * 1 >= max) throw `Invalid validator: ${str}`;
       } else if (!validators[str]) throw `Invalid validator: ${str}`;
@@ -66,13 +66,13 @@ const verify = (json, sch, validators = {}) => {
     lookups.forEach((s, i) => {
       let m;
       if ((m = s.match(/^\[(.+)\]$/))) {
-        m[1].split(',').forEach((v) => verifyValidator(v, i));
+        m[1].split(",").forEach((v) => verifyValidator(v, i));
       } else if ((m = s.match(/^\{(.+)\}$/))) {
         m[1]
-          .replace(/[\!\?]/g, '')
-          .split(',')
+          .replace(/[\!\?]/g, "")
+          .split(",")
           .forEach((part) => {
-            let [k, v] = part.split(':');
+            let [k, v] = part.split(":");
             verifyValidator(v, i);
           });
       }
@@ -106,7 +106,7 @@ const verify = (json, sch, validators = {}) => {
         return false;
       }
 
-      if (sch === '') return true; // no validation needed
+      if (sch === "") return true; // no validation needed
 
       // given a validator. we verify above so should never throw this
       if (!validators[sch]) throw `${sch} : Validator specified in JSON schema not found`;
@@ -122,14 +122,14 @@ const verify = (json, sch, validators = {}) => {
         errors.push(`${path}: should be array`);
         return false;
       }
-      type = 'array';
+      type = "array";
       sch = m[1];
     } else if ((m = sch.match(/^\{(.*)\}$/))) {
-      if (!_.isPlainObject(obj)) {
+      if (!_.isObject(obj) || _.isArray(obj)) {
         errors.push(`${path}: should be object`);
         return false;
       }
-      type = 'object';
+      type = "object";
       sch = m[1];
     }
 
@@ -137,16 +137,16 @@ const verify = (json, sch, validators = {}) => {
     if (!type) throw `${path}: Invalid type in Lookup`;
 
     // if array, validate for all
-    if (type === 'array') {
-      let sch_parts = sch.split(',');
+    if (type === "array") {
+      let sch_parts = sch.split(",");
       for (let i in obj)
         validate({ path: `${path}.${i}`, obj: obj[i], sch: sch_parts[i % sch_parts.length], parent: obj });
     }
 
-    if (type === 'object' && sch !== '') {
-      let keys = sch.split(',').reduce((acc, value) => {
-        let [k, v] = value.split(':');
-        if (!v) v = '';
+    if (type === "object" && sch !== "") {
+      let keys = sch.split(",").reduce((acc, value) => {
+        let [k, v] = value.split(":");
+        if (!v) v = "";
         acc[k] = v;
         return acc;
       }, {});
@@ -156,8 +156,8 @@ const verify = (json, sch, validators = {}) => {
     }
   }
 
-  validate({ path: 'json', obj: json, sch });
-  if (errors.length > 0) throw errors.join(', ');
+  validate({ path: "json", obj: json, sch });
+  if (errors.length > 0) throw errors.join(", ");
 
   return true;
 };
