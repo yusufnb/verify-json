@@ -5,6 +5,12 @@ import _ from "lodash";
 
 const validators = {};
 
+const RX_FLAT_ARRAY = /(\[([^\[\]\{\}]*)\])/;
+const RX_FLAT_OBJECT = /(\{([^\{\}\[\]]*)\})/;
+const RX_MALFORMED = /[\[\]\{\}]/;
+const RX_FLAT_SCALAR = /^[^\[\]\{\}]*$/;
+const RX_OPTIONAL = /^[\?]/;
+
 function addValidator(k, fn) {
   if (!_.isArray(k)) k = [k];
   k.forEach(n => {
@@ -19,127 +25,138 @@ addValidator(["integer","i"], _.isInteger);
 addValidator("array", _.isArray);
 addValidator("object", _.isObject);
 
-const flatten = (sch) => {
+const flatten = (schema) => {
   let lookups = [];
 
   // strip all white spaces
-  sch = sch.replace(/\s/g, "");
+  schema = schema.replace(/\s/g, "");
+  let default_strings = [];
+  let m;
+  // convert "hello world" to $0. remote " (quotes)
+  while(m = schema.match(/("[^"]+")/)) {
+    schema = schema.substr(0, m.index) + `$${default_strings.length}` + schema.substr(m.index + m[0].length);
+    default_strings.push(m[0]);
+  }
+  if (schema.match(/"/)) throw "Missing closing quote";
 
-  function reduce(sch) {
+  function reduce(schema) {
     let m;
     let found = false;
-    while ((m = sch.match(/(\[[^\[\]\{\}]*\])/)) || (m = sch.match(/(\{[^\{\}\[\]]*\})/))) {
-      sch = sch.substr(0, m.index) + lookups.length + sch.substr(m.index + m[0].length);
+    while ((m = schema.match(RX_FLAT_ARRAY)) || (m = schema.match(RX_FLAT_OBJECT))) {
+      schema = schema.substr(0, m.index) + lookups.length + schema.substr(m.index + m[0].length);
       // support [:i,:s] instead of [i,s]
       if (m[0].match(/^\[/)) m[0] = m[0].replace(/\:/g, "");
       lookups.push(m[0]);
       found = true;
     }
 
-    if (found) reduce(sch);
-    if (!found && sch.match(/[\[\]\{\}]/) ) {
+    if (found) reduce(schema);
+    if (!found && schema.match(RX_MALFORMED) ) {
       throw "Malformed schema";
     }
-    return sch;
+    return schema;
   }
 
-  sch = reduce(sch);
-  return [sch, lookups];
+  schema = reduce(schema);
+  return [schema, lookups, default_strings];
 };
 
-const shape = (json, sch) => {
+const shape = (json, schema) => {
 
-  let lookups;
-  [sch, lookups] = flatten(sch);
+  let lookups, default_strings;
+  [schema, lookups, default_strings] = flatten(schema);
+  let result = null;
 
+  function traverse({value, result, schema}) {
+    if (schema.match(/^\[/)) {
+      if (!result) result = [];
+      let m = schema.match(/^\[(.*)\]$/);
+      let schema_parts = m[1].split(",");
+    }
+
+  }
+
+  traverse({value: json, result, schema});
 };
 
-const verify = (json, sch) => {
+const verify = (json, schema) => {
   let errors = [];
 
   let lookups;
-  [sch, lookups] = flatten(sch);
+  [schema, lookups] = flatten(schema);
 
   //console.log("lookups", lookups);
 
-  // flat validator
-  function validate({ path, obj, sch, parent = null }) {
-    //console.log("validate", obj, sch);
+  // flat validator value = {k:t:d,..} [t:d,..] t:d
+  function validate({ path, value, schema, parent = null }) {
+    //console.log("validate", value, schema);
     let m;
     let type = null;
-    let optional = false;
-    if (sch.match(/^[\?]/)) {
-      sch = sch.substr(1);
-      optional = true;
+
+    if (schema.match(RX_OPTIONAL)) {
+      schema = schema.substr(1);
+      if (value === undefined || value === null) return true;
     }
 
-    if (optional && (obj === undefined || obj === null)) return true;
-
     // if lookup, validate further
-    if ((m = sch.match(/^[0-9]+$/))) return validate({ path: `${path}`, obj, sch: lookups[sch * 1], parent: parent });
+    if ((m = schema.match(/^[0-9]+$/))) return validate({ path: `${path}`, value, schema: lookups[schema * 1], parent: parent });
 
-    // if validator verify it now
-    if (sch.match(/^[a-zA-Z0-9_]*$/)) {
-      if (obj === undefined || obj === null) {
+    if (schema.match(RX_FLAT_SCALAR)) {
+      // if scalar
+      let def;
+      [schema, def] = schema.split(":");
+      if (value === undefined || value === null) {
         errors.push(`${path}: is required`);
         return false;
       }
 
-      if (sch === "") return true; // no validation needed
+      if (schema === "") return true; // no validation needed
 
-      if (!validators[sch]) throw `${sch} : Validator specified in JSON schema not found`;
-      else if (validators[sch](obj, { path, json, parent })) return true;
+      if (!validators[schema]) throw `${schema} : Validator specified in JSON schema not found`;
+      else if (validators[schema](value, { path, json, parent })) return true;
       else {
         errors.push(`${path}: validation failed`);
         return false;
       }
-    }
-
-    if ((m = sch.match(/^\[(.*)\]$/))) {
-      if (!_.isArray(obj)) {
+    } else if ((m = schema.match(RX_FLAT_ARRAY))) {
+      // if array
+      if (!_.isArray(value)) {
         errors.push(`${path}: should be array`);
         return false;
       }
       type = "array";
-      sch = m[1];
-    } else if ((m = sch.match(/^\{(.*)\}$/))) {
-      if (!_.isObject(obj) || _.isArray(obj)) {
+      schema = m[2];
+      let schema_parts = schema.split(",");
+      for (let i in value) {
+        validate({ path: `${path}.${i}`, value: value[i], schema: schema_parts[i % schema_parts.length], parent: value });
+      }
+    } else if ((m = schema.match(RX_FLAT_OBJECT))) {
+      // if object
+      if (!_.isObject(value) || _.isArray(value)) {
         errors.push(`${path}: should be object`);
         return false;
       }
       type = "object";
-      sch = m[1];
+      schema = m[2];
+      if (schema !== "") {
+        let keys = schema.split(",").reduce((acc, name) => {
+          let [k, t] = name.split(":");
+          if (!t) t = "";
+          acc[k] = t;
+          return acc;
+        }, {});
+  
+        // if object, validate for all k-v
+        for (let k in keys) validate({ path: `${path}.${k}`, value: value[k], schema: keys[k], parent: value });
+      }
     }
 
-    // This should never happen as well
-    if (!type) throw `${path}: Invalid type in Lookup`;
-
-    // if array, validate for all
-    if (type === "array") {
-      let sch_parts = sch.split(",");
-      for (let i in obj)
-        validate({ path: `${path}.${i}`, obj: obj[i], sch: sch_parts[i % sch_parts.length], parent: obj });
-    }
-
-    if (type === "object" && sch !== "") {
-      let keys = sch.split(",").reduce((acc, value) => {
-        let [k, v] = value.split(":");
-        if (!v) v = "";
-        acc[k] = v;
-        return acc;
-      }, {});
-
-      // if object, validate for all k-v
-      for (let k in keys) validate({ path: `${path}.${k}`, obj: obj[k], sch: keys[k], parent: obj });
-    }
   }
 
-  validate({ path: "json", obj: json, sch });
+  validate({ path: "json", value: json, schema });
   if (errors.length > 0) throw errors.join(", ");
 
   return true;
 };
 
-_.mixin({ verify: verify }, { chain: false });
-
-export { verify };
+export { verify, addValidator };
