@@ -4,22 +4,12 @@
 /* eslint-disable no-unused-expressions */
 import { assert, expect } from 'chai';
 import _ from 'lodash';
-import verify from '../src';
+import {verify, addValidator} from '../src';
 
 describe('Development', () => {
   it('should validate schema definition', () => {
-    expect(() => verify({}, '{a:test}')).to.throw('Invalid validator: test');
-    expect(() => verify({}, '{a:test}', { test: true })).to.throw('Invalid validator: test');
     expect(verify({ a: [1, '2'] }, '{a:?[:i,s]}')).to.be.true;
     expect(() => verify({}, '{a:[i,s]}}')).to.throw('Malformed schema');
-    expect(() => verify({}, '{a:[z]}')).to.throw('Invalid validator: z');
-    expect(
-      verify({}, '{a:?[z]}', {
-        z: function () {
-          return true;
-        },
-      })
-    ).to.be.true;
   });
 
   it('should verify simple plain objects', () => {
@@ -36,7 +26,6 @@ describe('Development', () => {
     expect(verify({ a: 1 }, '{a,b:?}')).to.be.true;
     expect(verify({ a: 1, b: false }, '{a,b}')).to.be.true;
     expect(() => verify({ a: 1, b: null }, '{a,b}')).to.throw('json.b: is required');
-    expect(() => verify({ a: { c: 1 }, b: 0 }, '{a,b:0}')).to.throw('Invalid validator: 0');
   });
 
   it('should verify simple arrays', () => {
@@ -49,52 +38,33 @@ describe('Development', () => {
   });
 
   it('should work with custom validators', () => {
-    assert(
-      verify({ a: 'hello' }, '{a: custom }', {
-        custom: function (v, args) {
-          return v === 'hello';
-        },
-      }) === true,
-      'Failed'
-    );
+    addValidator('custom', function (v, args) {
+      return v === 'hello';
+    });
+    
+    assert(verify({ a: 'hello' }, '{a: custom }') === true, 'Failed');
 
-    assert(
-      verify({ a: 'hello' }, '{a:my_val }', {
-        my_val: function (v, args) {
-          return v === 'hello';
-        },
-      }) === true,
-      'Failed'
-    );
+    addValidator('my_val', function (v, args) {
+      return v === 'hello';
+    });
+    assert(verify({ a: 'hello' }, '{a:my_val }') === true, 'Failed' );
 
     expect(() =>
-      verify({ a: 'hello' }, '{a:my_val }', {
-        my_val: function (v, args) {
-          return v === 'world';
-        },
-      })
+      verify({ a: 'world' }, '{a:my_val }')
     ).to.throw('json.a: validation failed');
 
-    expect(() =>
-      verify({}, '{}', {
-        'a-b': function () {},
-      })
-    ).to.throw('Invalid validator key: a-b');
-
-    let validator = {
-      custom: function (v, args) {
-        return (args.parent.type === 'foo' && v === 'bar') || (args.parent.type === 'hello' && v === 'world');
-      },
-    };
+    addValidator('custom', function (v, args) {
+      return (args.parent.type === 'foo' && v === 'bar') || (args.parent.type === 'hello' && v === 'world');
+    });
 
     let json = [
       { type: 'hello', value: 'world' },
       { type: 'foo', value: 'bar' },
     ];
 
-    expect(verify(json, '[{type:s, value: custom }]', validator)).to.be.true;
+    expect(verify(json, '[{type:s, value: custom }]')).to.be.true;
     json[0].value = 'world1';
-    expect(() => verify(json, '[{type:s, value: custom }]', validator)).to.throw('json.0.value: validation failed');
+    expect(() => verify(json, '[{type:s, value: custom }]')).to.throw('json.0.value: validation failed');
   });
 
   it('should work with complex objects', () => {
@@ -121,7 +91,8 @@ describe('Development', () => {
         '[{a:i,b:i}]'
       )
     ).to.throw('json.1.b: validation failed');
-
+    addValidator('lat', (val) => val >= -90 && val <= 90);
+    addValidator('long', (val) => val >= -180 && val <= 180);
     expect(
       verify(
         {
@@ -136,12 +107,7 @@ describe('Development', () => {
             },
           ],
         },
-        '{markers:[{name,location:[:lat,:long]}]}',
-        {
-          lat: (val) => val >= -90 && val <= 90,
-          long: (val) => val >= -180 && val <= 180,
-        }
-      )
+        '{markers:[{name,location:[:lat,:long]}]}')
     ).to.be.true;
 
     expect(
@@ -153,13 +119,8 @@ describe('Development', () => {
           e: 1,
           p: 1,
         },
-        '{a:number,b:string,c:{ def:{ e: [ { a,b:[s],c:string } ] },e:[i],p:number,f:?string }, e:?, p, q:?, r:!}'
+        '{a:number,b:string,c:{ def:{ e: [ { a,b:[s],c:string } ] },e:[i],p:number,f:?string }, e:?, p, q:?, r:?}'
       )
     ).to.be.true;
-  });
-
-  it('should work as a mixin', () => {
-    expect(_.verify({ a: 1 }, '{a}')).to.be.true;
-    expect(() => _.verify({ a: 1 }, '{b}')).to.throw('json.b: is required');
   });
 });
