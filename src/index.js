@@ -44,8 +44,6 @@ const flatten = (schema) => {
     let found = false;
     while ((m = schema.match(RX_FLAT_ARRAY)) || (m = schema.match(RX_FLAT_OBJECT))) {
       schema = schema.substr(0, m.index) + lookups.length + schema.substr(m.index + m[0].length);
-      // support [:i,:s] instead of [i,s]
-      if (m[0].match(/^\[/)) m[0] = m[0].replace(/\:/g, "");
       lookups.push(m[0]);
       found = true;
     }

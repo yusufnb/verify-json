@@ -36,6 +36,17 @@ describe('Development', () => {
     expect(verify([1, 2, 3], '[i]')).to.be.true;
     expect(() => verify([1, '2', 3], '[i]')).to.throw('json.1: validation failed');
   });
+  
+  it('should support sample defaults in schema', () => {
+    expect(verify({ a: 1, b: 2 }, '{a:i:0,b:i:0,c:?:1}')).to.be.true;
+    expect(() => verify({ a: 1, b: 2 }, '{a:i:0,b:s:0,c:s:1}')).to.throw('json.b: validation failed, json.c: is required');
+
+    expect(verify([1,"hello",2,"world"], '[i:0,s:"hello world"]')).to.be.true;
+    expect(() => verify([1,"hello",2,3], '[i:0,s:"hello world"]')).to.throw('json.3: validation failed');
+
+    expect(verify(1, 'i:0')).to.be.true;
+    expect(() => verify(1, 's:0')).to.throw('json: validation failed');
+  });
 
   it('should work with custom validators', () => {
     addValidator('custom', function (v, args) {
@@ -107,7 +118,7 @@ describe('Development', () => {
             },
           ],
         },
-        '{markers:[{name,location:[:lat,:long]}]}')
+        '{markers:[{name,location:[lat,long]}]}')
     ).to.be.true;
 
     expect(
