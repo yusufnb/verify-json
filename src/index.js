@@ -2,37 +2,28 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-cond-assign */
 import _ from "lodash";
-const verify = (json, sch, validators = {}) => {
-  let errors = [];
 
-  // verify the format of validators
-  if (!_.isEmpty(validators)) {
-    for (let k in validators) {
-      if (!k.match(/^[a-zA-Z0-9_]+$/)) errors.push(`Invalid validator key: ${k}`);
-      else if (!_.isFunction(validators[k])) errors.push(`Invalid validator: ${k}`);
-    }
-    if (errors.length > 0) throw errors.join(", ");
-  }
+const validators = {};
 
-  // extend validators with inbuilts
-  validators = Object.assign(
-    {
-      string: _.isString,
-      s: _.isString,
-      number: _.isNumber,
-      n: _.isNumber,
-      boolean: _.isBoolean,
-      b: _.isBoolean,
-      integer: _.isInteger,
-      i: _.isInteger,
-    },
-    validators
-  );
+function addValidator(k, fn) {
+  if (!_.isArray(k)) k = [k];
+  k.forEach(n => {
+    validators[n] = fn;
+  });
+}
+
+addValidator(["string","s"], _.isString);
+addValidator(["number","n"], _.isNumber);
+addValidator(["boolean","b"], _.isBoolean);
+addValidator(["integer","i"], _.isInteger);
+addValidator("array", _.isArray);
+addValidator("object", _.isObject);
+
+const flatten = (sch) => {
+  let lookups = [];
 
   // strip all white spaces
   sch = sch.replace(/\s/g, "");
-
-  let lookups = [];
 
   function reduce(sch) {
     let m;
@@ -46,40 +37,28 @@ const verify = (json, sch, validators = {}) => {
     }
 
     if (found) reduce(sch);
-    if (!found && (sch.match(/[\[\]]/) || sch.match(/[\{\}]/))) {
+    if (!found && sch.match(/[\[\]\{\}]/) ) {
       throw "Malformed schema";
     }
     return sch;
   }
 
   sch = reduce(sch);
+  return [sch, lookups];
+};
 
-  function validateValidators() {
-    function verifyValidator(str, max) {
-      if (!str || str === "") return;
-      if (str.match(/^[0-9]+$/)) {
-        if (str * 1 >= max) throw `Invalid validator: ${str}`;
-      } else if (!validators[str]) throw `Invalid validator: ${str}`;
-    }
+const shape = (json, sch) => {
 
-    // validate validators. lookups provide the validator tokens.
-    lookups.forEach((s, i) => {
-      let m;
-      if ((m = s.match(/^\[(.+)\]$/))) {
-        m[1].split(",").forEach((v) => verifyValidator(v, i));
-      } else if ((m = s.match(/^\{(.+)\}$/))) {
-        m[1]
-          .replace(/[\!\?]/g, "")
-          .split(",")
-          .forEach((part) => {
-            let [k, v] = part.split(":");
-            verifyValidator(v, i);
-          });
-      }
-    });
-  }
+  let lookups;
+  [sch, lookups] = flatten(sch);
 
-  validateValidators();
+};
+
+const verify = (json, sch) => {
+  let errors = [];
+
+  let lookups;
+  [sch, lookups] = flatten(sch);
 
   //console.log("lookups", lookups);
 
@@ -89,7 +68,7 @@ const verify = (json, sch, validators = {}) => {
     let m;
     let type = null;
     let optional = false;
-    if (sch.match(/^[\!\?]/)) {
+    if (sch.match(/^[\?]/)) {
       sch = sch.substr(1);
       optional = true;
     }
@@ -108,7 +87,6 @@ const verify = (json, sch, validators = {}) => {
 
       if (sch === "") return true; // no validation needed
 
-      // given a validator. we verify above so should never throw this
       if (!validators[sch]) throw `${sch} : Validator specified in JSON schema not found`;
       else if (validators[sch](obj, { path, json, parent })) return true;
       else {
@@ -163,7 +141,5 @@ const verify = (json, sch, validators = {}) => {
 };
 
 _.mixin({ verify: verify }, { chain: false });
-
-export default verify;
 
 export { verify };
