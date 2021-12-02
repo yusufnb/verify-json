@@ -1,7 +1,7 @@
 /* eslint-disable nonblock-statement-body-position */
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-cond-assign */
-import _ from "lodash";
+import {isArray, isObject, isString, isNumber, isBoolean, isInteger} from "lodash";
 
 const types = {};
 
@@ -13,16 +13,16 @@ const RX_OPTIONAL = /^[\?]/;
 const RX_LOOKUP = /^[0-9]+$/;
 
 function addType(k, fn) {
-  if (!_.isArray(k)) k = [k];
+  if (!isArray(k)) k = [k];
   k.forEach(n => {
     types[n] = fn;
   });
 }
 
-addType(["string","s"], (v) => v !== undefined ? _.isString(v) : "String value!");
-addType(["number","n"], (v) => v !== undefined ? _.isNumber(v) : 2);
-addType(["boolean","b"], (v) => v !== undefined ? _.isBoolean(v) : true);
-addType(["integer","i"], (v) => v !== undefined ? _.isInteger(v) : 2);
+addType(["string","s"], (v) => v !== undefined ? isString(v) : "String value!");
+addType(["number","n"], (v) => v !== undefined ? isNumber(v) : 2);
+addType(["boolean","b"], (v) => v !== undefined ? isBoolean(v) : true);
+addType(["integer","i"], (v) => v !== undefined ? isInteger(v) : 2);
 
 const flatten = (schema) => {
   let lookups = [];
@@ -98,7 +98,7 @@ const shape = (json, schema, options = {}) => {
       // if array
       schema = m[2];
       let schema_parts = schema.split(",");
-      if (!_.isArray(value)) value = schema_parts.map(s => null);
+      if (!isArray(value)) value = schema_parts.map(s => null);
       if (value.length < schema_parts.length) {
         value = value.concat(schema_parts.slice(value.length).map(s => null));
       }
@@ -107,7 +107,7 @@ const shape = (json, schema, options = {}) => {
 
     } else if ((m = schema.match(RX_FLAT_OBJECT))) {
       // if object
-      if (!_.isObject(value) || _.isArray(value)) {
+      if (!isObject(value) || isArray(value)) {
         value = {};
       }
       schema = m[2];
@@ -171,7 +171,7 @@ const verify = (json, schema, options) => {
       }
     } else if ((m = schema.match(RX_FLAT_ARRAY))) {
       // if array
-      if (!_.isArray(value)) {
+      if (!isArray(value)) {
         errors.push(`${path}: should be array`);
         return false;
       }
@@ -182,7 +182,7 @@ const verify = (json, schema, options) => {
       }
     } else if ((m = schema.match(RX_FLAT_OBJECT))) {
       // if object
-      if (!_.isObject(value) || _.isArray(value)) {
+      if (!isObject(value) || isArray(value)) {
         errors.push(`${path}: should be object`);
         return false;
       }

@@ -21,14 +21,14 @@ describe('Shape', () => {
     return (typeof val === 'string' || val instanceof String) ? true : false;
   });
 
-  it.only('should use custom type default', () => {
+  it('should use custom type default', () => {
     let val = shape({a: 1}, "{a:url,b:?url}", {excludeOptional: false});
     assert.deepEqual(val, {a: 'http://example.com', b: 'http://example.com'});
   })
 
   it('should extend values', () => {
     let val = shape({a:{},b:[]}, "{a:{a1:i,a2:s},b:[i,s]}");
-    console.log(val);
+    assert.deepEqual(val, { a: { a1: 2, a2: 'String value!' }, b: [ 2, 'String value!' ] })
   });
 });
 
