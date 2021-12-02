@@ -3,33 +3,30 @@
 /* eslint-disable no-cond-assign */
 import _ from "lodash";
 
-const validators = {};
+const types = {};
 
 const RX_FLAT_ARRAY = /(\[([^\[\]\{\}]*)\])/;
 const RX_FLAT_OBJECT = /(\{([^\{\}\[\]]*)\})/;
 const RX_MALFORMED = /[\[\]\{\}]/;
 const RX_FLAT_SCALAR = /^[^\[\]\{\}]*$/;
 const RX_OPTIONAL = /^[\?]/;
+const RX_LOOKUP = /^[0-9]+$/;
 
-function addValidator(k, fn) {
+function addType(k, fn) {
   if (!_.isArray(k)) k = [k];
   k.forEach(n => {
-    validators[n] = fn;
+    types[n] = fn;
   });
 }
 
-addValidator(["string","s"], _.isString);
-addValidator(["number","n"], _.isNumber);
-addValidator(["boolean","b"], _.isBoolean);
-addValidator(["integer","i"], _.isInteger);
-addValidator("array", _.isArray);
-addValidator("object", _.isObject);
+addType(["string","s"], (v) => v !== undefined ? _.isString(v) : "String value!");
+addType(["number","n"], (v) => v !== undefined ? _.isNumber(v) : 2);
+addType(["boolean","b"], (v) => v !== undefined ? _.isBoolean(v) : true);
+addType(["integer","i"], (v) => v !== undefined ? _.isInteger(v) : 2);
 
 const flatten = (schema) => {
   let lookups = [];
 
-  // strip all white spaces
-  schema = schema.replace(/\s/g, "");
   let default_strings = [];
   let m;
   // convert "hello world" to $0. remote " (quotes)
@@ -38,6 +35,9 @@ const flatten = (schema) => {
     default_strings.push(m[0]);
   }
   if (schema.match(/"/)) throw "Missing closing quote";
+
+  // strip all white spaces
+  schema = schema.replace(/\s/g, "");
 
   function reduce(schema) {
     let m;
@@ -59,25 +59,78 @@ const flatten = (schema) => {
   return [schema, lookups, default_strings];
 };
 
-const shape = (json, schema) => {
-
+const shape = (json, schema, options = {}) => {
+  options = Object.assign({excludeOptional: false}, options);
+  let excludeOptional = options.excludeOptional;
   let lookups, default_strings;
   [schema, lookups, default_strings] = flatten(schema);
-  let result = null;
 
-  function traverse({value, result, schema}) {
-    if (schema.match(/^\[/)) {
-      if (!result) result = [];
-      let m = schema.match(/^\[(.*)\]$/);
-      let schema_parts = m[1].split(",");
+  const getValue = (type, value, def) => {
+    let m;
+    if (def && (m = def.match(/^\$([0-9]+)$/))) def = default_strings[m[1] * 1];
+
+    if (types[type]) return (value && types[type](value)) ? value : (def !== undefined) ? def : types[type]();
+
+    return value || def || "Not defined!";
+  };
+  
+    // flat validator value = {k:t:d,..} [t:d,..] t:d
+  function traverse({ value, schema }) {
+    if (!schema) schema = "";
+    let m;
+    let optional = false;
+    if (schema.match(RX_OPTIONAL)) {
+      schema = schema.substr(1);
+      optional = true;
+    }
+
+    // if lookup, validate further
+    if ((m = schema.match(RX_LOOKUP))) return traverse({ value, schema: lookups[schema * 1] });
+
+    if (schema.match(RX_FLAT_SCALAR)) {
+      // if scalar
+      if (!value && optional && excludeOptional) return null;
+      let type, def;
+      [type, def] = schema.split(":");
+      return getValue(type, value, def);
+
+    } else if ((m = schema.match(RX_FLAT_ARRAY))) {
+      // if array
+      schema = m[2];
+      let schema_parts = schema.split(",");
+      if (!_.isArray(value)) value = schema_parts.map(s => null);
+      if (value.length < schema_parts.length) {
+        value = value.concat(schema_parts.slice(value.length).map(s => null));
+      }
+      
+      return value.map((v,i) => traverse({ value: v, schema: schema_parts[i % schema_parts.length] }));
+
+    } else if ((m = schema.match(RX_FLAT_OBJECT))) {
+      // if object
+      if (!_.isObject(value) || _.isArray(value)) {
+        value = {};
+      }
+      schema = m[2];
+      if (schema === "") return value;
+
+      return schema.split(",").reduce((acc, name) => {
+        let [k, t, d] = name.split(":");
+        if (!t) t = "";
+        if (d) t += ":" + d;
+        acc[k] = traverse({ value: value[k], schema: t });
+        return acc;
+      }, {});
+      
     }
 
   }
 
-  traverse({value: json, result, schema});
+  let result = traverse({ value: json, schema });
+  return result;
 };
 
-const verify = (json, schema) => {
+const verify = (json, schema, options) => {
+  options = Object.assign({name: 'json'}, options);
   let errors = [];
 
   let lookups;
@@ -97,7 +150,7 @@ const verify = (json, schema) => {
     }
 
     // if lookup, validate further
-    if ((m = schema.match(/^[0-9]+$/))) return validate({ path: `${path}`, value, schema: lookups[schema * 1], parent: parent });
+    if ((m = schema.match(RX_LOOKUP))) return validate({ path: `${path}`, value, schema: lookups[schema * 1], parent: parent });
 
     if (schema.match(RX_FLAT_SCALAR)) {
       // if scalar
@@ -110,8 +163,8 @@ const verify = (json, schema) => {
 
       if (schema === "") return true; // no validation needed
 
-      if (!validators[schema]) throw `${schema} : Validator specified in JSON schema not found`;
-      else if (validators[schema](value, { path, json, parent })) return true;
+      if (!types[schema]) throw `${schema} : Validator specified in JSON schema not found`;
+      else if (types[schema](value, { path, json, parent })) return true;
       else {
         errors.push(`${path}: validation failed`);
         return false;
@@ -122,7 +175,6 @@ const verify = (json, schema) => {
         errors.push(`${path}: should be array`);
         return false;
       }
-      type = "array";
       schema = m[2];
       let schema_parts = schema.split(",");
       for (let i in value) {
@@ -134,7 +186,6 @@ const verify = (json, schema) => {
         errors.push(`${path}: should be object`);
         return false;
       }
-      type = "object";
       schema = m[2];
       if (schema !== "") {
         let keys = schema.split(",").reduce((acc, name) => {
@@ -151,10 +202,21 @@ const verify = (json, schema) => {
 
   }
 
-  validate({ path: "json", value: json, schema });
+  validate({ path: options.name, value: json, schema });
   if (errors.length > 0) throw errors.join(", ");
 
   return true;
 };
 
-export { verify, addValidator };
+// same as verify. returns boolean. won't throw.
+const check = (json, schema) => {
+  flatten(schema);
+  try {
+    verify(json, schema);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+export { verify, check, shape, addType };

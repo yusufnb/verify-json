@@ -2,11 +2,49 @@
 /* eslint-disable object-shorthand */
 /* eslint-disable quotes */
 /* eslint-disable no-unused-expressions */
-import { assert, expect } from 'chai';
+import chai, { assert, expect } from 'chai';
 import _ from 'lodash';
-import {verify, addValidator} from '../src';
+import {verify, shape, check, addType} from '../src';
 
-describe('Development', () => {
+describe('Shape', () => {
+  it('should return value', () => {
+    //let val = shape({e: 12}, "{a,b,c:i:10,\nd:[i,s:\"hello world\"],e:?s}", {excludeOptional: true});
+    let val = shape({a: {foo: 'bar'}}, "{a}");
+    assert.deepEqual(val, {a: {foo: 'bar'}});
+
+    val = shape({a: [1,2,3]}, "{a:?}");
+    assert.deepEqual(val, {a: [1,2,3]});
+  });
+
+  addType('url', (val) => {
+    if (val === undefined) return 'http://example.com';
+    return (typeof val === 'string' || val instanceof String) ? true : false;
+  });
+
+  it.only('should use custom type default', () => {
+    let val = shape({a: 1}, "{a:url,b:?url}", {excludeOptional: false});
+    assert.deepEqual(val, {a: 'http://example.com', b: 'http://example.com'});
+  })
+
+  it('should extend values', () => {
+    let val = shape({a:{},b:[]}, "{a:{a1:i,a2:s},b:[i,s]}");
+    console.log(val);
+  });
+});
+
+describe('Check', () => {
+  it('should throw on invalid schema', () => {
+    expect(() => check({a: [1,2]}, '{a:[s]}}')).to.throw('Malformed schema');
+  });
+  it('should return false on invalid json', () => {
+    expect(check({a: [1,2]}, '{a:[s]}')).to.be.false;
+  });
+  it('should return true on valid json', () => {
+    expect(check({a: [1,2]}, '{a:[i]}')).to.be.true;
+  });
+});
+
+describe('Verify', () => {
   it('should validate schema definition', () => {
     expect(verify({ a: [1, '2'] }, '{a:?[:i,s]}')).to.be.true;
     expect(() => verify({}, '{a:[i,s]}}')).to.throw('Malformed schema');
@@ -49,13 +87,13 @@ describe('Development', () => {
   });
 
   it('should work with custom validators', () => {
-    addValidator('custom', function (v, args) {
+    addType('custom', function (v, args) {
       return v === 'hello';
     });
     
     assert(verify({ a: 'hello' }, '{a: custom }') === true, 'Failed');
 
-    addValidator('my_val', function (v, args) {
+    addType('my_val', function (v, args) {
       return v === 'hello';
     });
     assert(verify({ a: 'hello' }, '{a:my_val }') === true, 'Failed' );
@@ -64,7 +102,7 @@ describe('Development', () => {
       verify({ a: 'world' }, '{a:my_val }')
     ).to.throw('json.a: validation failed');
 
-    addValidator('custom', function (v, args) {
+    addType('custom', function (v, args) {
       return (args.parent.type === 'foo' && v === 'bar') || (args.parent.type === 'hello' && v === 'world');
     });
 
@@ -102,8 +140,8 @@ describe('Development', () => {
         '[{a:i,b:i}]'
       )
     ).to.throw('json.1.b: validation failed');
-    addValidator('lat', (val) => val >= -90 && val <= 90);
-    addValidator('long', (val) => val >= -180 && val <= 180);
+    addType('lat', (val) => val >= -90 && val <= 90);
+    addType('long', (val) => val >= -180 && val <= 180);
     expect(
       verify(
         {
