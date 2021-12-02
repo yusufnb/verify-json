@@ -1,108 +1,79 @@
 # Verify JSON
 
-Library to verify JSON structure easily using a lightweight JSON schema syntax
+Library to verify and shape JSON easily using a Flat JSON schema syntax
 
 # About
 
 This project results from my need to verify JSON schema in a lightweight manner, without the need for an extensive definition and development code.
 
-The schema syntax is minimalist and extremely easy to write.
+It uses the flat-json schema documented [here](https://github.com/sleeksky-dev/json-flat-schema)
+
+# Flat JSON Schema
+Scalars represented as: `type:example`
+
+Key value pairs representaed as: `key_name:type:example`
+
+Example: Array of integers - `"[i]"` or `"[integer]"` or `"[i:2]"`
+
+Example: Object - `"{a:i,b:s}"` or `"{a:integer,b:string}"`
+
+Example: Object with Array or integers - `"{a:[i]}"`
 
 # Installation
 
 ```JavaScript
 npm install -s verify-json
 
-const verify = require('verify-json')
+const {verify, check, shape, addType } = require('verify-json')
 
-import verify from 'verify-json';
+import {verify, check, shape, addType } from 'verify-json';
 ```
 
-# Example
+# verify
 
 ```JavaScript
 const { verify } = require("verify-json");
 
-let json = {
-  markers: [
-    {
-      stars: 5,
-      name: 'Rixos The Palm Dubai',
-      location: [25.1212, 55.1535],
-      favorite: true,
-      color: 'red',
-    },
-    {
-      stars: 4,
-      name: 'Shangri-La Hotel',
-      location: [25.2084, 55.2719],
-      color: 'blue',
-    },
-  ],
-};
-
-// <key>:<validator>
-// <key>:?<validator> - uses ? for optional
-// <key> - required non null attribute of any type
-// Skip all the quotations
-const schema = `{markers: [{
-      stars:i,
-      name:string,
-      location:[:lat,:long],
-      favorite:?b,
-      color:color
-  }]
-}`;
-
-// customValidators are optional. See built-in validators.
-const customValidators = {
-  lat: (val) => val >= -90 && val <= 90,
-  long: (val) => val >= -180 && val <= 180,
-  color: (val, args) => {
-    // demonstrating conditional validations. args = { json, path, parent }
-    return (args.parent.stars === 5 && val === 'red') || (args.parent.stars === 4 && val === 'blue');
-  },
-};
-
-let result = verify(json, schema, customValidators);
-
-console.log(result); // true
-
-json.markers[0].location[0] = 1000;
-json.markers[0].color = 'blue';
-try {
-  verify(json, schema, customValidators);
-} catch (error) {
-  console.log('error', error); // json.markers.0.location.0: validation failed, json.markers.0.color: validation failed
-}
-
-
+let schema = "{a:i,b:[i],c:?b}";
+let object = {"a":1, "b":[1,2,3], "c": false}
+verify(object, schema); 
+// true
 ```
 
-# Built-in Validators
-
-Following validators are built in and can be used directly -
-
+# check
+Same as verify except return boolean instead of throwing error
 ```JavaScript
-{
-    string    : _.isString,
-    s         : _.isString,      // alias for string
-    number    : _.isNumber,
-    n         : _.isNumber,      // alias for number
-    boolean   : _.isBoolean,
-    b         : _.isBoolean,     // alias for boolean
-    integer   : _.isInteger,
-    i         : _.isInteger,     // alias for integer
-}
+const {check} = require("verify-json");
 
+let schema = "{a:i,b:[i],c:?b}";
+let object = {"a":1, "b":[1,2,3], "c": 10}
+verify(object, schema); 
+// false
 ```
 
-# Use as a mixin
-
-Since `lodash` is a dependency, this method is also exposed as a lodash mixin. Once imported anywhere, you can simply use `_.verify` to access it.
-
+# shape
+Return an object in the shape of the schema, making best effort of using values from the data object.
 ```JavaScript
-_.verify(json, schema, customValidators)
+const {shape} = require("verify-json");
+
+let schema = "{a:i,b:[i],c:b}";
+let object = {"a":1, "b":[1], "d": 1}
+shape(object, schema); 
+// {"a": 1, "b":[1], "c":true}
+```
+
+# addType
+Add custom type validators and optional provide default values when shaping objects
+```JavaScript
+const {shape, addType} = require("verify-json");
+
+addType('url', (value) => {
+  if (value === undefined) return 'https://example.com'; // shape sample
+  return value.match(/^http/) ? true : false;
+});
+
+shape(null, "{img:url}");
+// {"img": "https://example.com"}
 ```
 
 # License
